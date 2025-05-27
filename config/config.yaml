@@ -1,0 +1,32 @@
+server:
+  # NAS access points
+  nas_networks:
+    - 192.168.1.0/24
+    - 10.0.0.0/24
+  # RADIUS shared secret
+  secret: "testing123"
+  # Authentication ports
+  auth_port: 1812
+  # Accounting ports
+  acct_port: 1813
+
+redis:
+  host: "localhost"
+  port: 6379
+  db: 0
+  password: ""
+
+kafka:
+  brokers:
+    - "localhost:9092"
+  topic: "radius_accounting"
+
+logging:
+  # Log file path
+  file: "/var/log/gradius/radius.log"
+  # Log level (debug, info, warn, error)
+  level: "info"
+  # Max size in MB before rotation
+  max_size: 1024
+  # Number of backups to keep
+  max_backups: 5
