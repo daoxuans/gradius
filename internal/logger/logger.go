@@ -21,7 +21,11 @@ func Init(filePath string, level string, maxSize int, maxBackups int) error {
 	log.SetLevel(lvl)
 
 	// Set log format to JSON
-	log.SetFormatter(&logrus.JSONFormatter{})
+	// log.SetFormatter(&logrus.JSONFormatter{})
+	log.SetFormatter(&logrus.TextFormatter{
+		FullTimestamp: true,
+		DisableColors: false,
+	})
 
 	// Set up log rotation
 	rotator := &lumberjack.Logger{

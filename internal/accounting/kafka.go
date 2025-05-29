@@ -4,23 +4,26 @@ import (
 	"encoding/json"
 	"fmt"
 	"gradius/internal/logger"
-	"time"
 
 	"github.com/IBM/sarama"
 	"github.com/sirupsen/logrus"
 )
 
+// accounting.AccountingData 定义文件：kafka.go
 type AccountingData struct {
-	Username    string    `json:"username"`
-	NASIPAddr   string    `json:"nas_ip_addr"`
-	SessionID   string    `json:"session_id"`
-	StartTime   time.Time `json:"start_time,omitempty"`
-	StopTime    time.Time `json:"stop_time,omitempty"`
-	BytesIn     uint32    `json:"bytes_in"`
-	BytesOut    uint32    `json:"bytes_out"`
-	PacketsIn   uint32    `json:"packets_in"`
-	PacketsOut  uint32    `json:"packets_out"`
-	SessionTime int       `json:"session_time"`
+	EventType        string `json:"event_type"`          // Start/Interim-Update/Stop
+	Timestamp        int64  `json:"timestamp"`           // Unix 时间戳（秒）
+	EventTimestamp   string `json:"event_timestamp"`     // ISO8601 UTC 时间
+	UserName         string `json:"user_name"`           // 用户名 => user_name
+	NasIdentifier    string `json:"nas_identifier"`      // NAS 设备标识
+	NASIPAddr        string `json:"nas_ip"`              // 原 "nas_ip_addr" => nas_ip
+	AcctSessionID    string `json:"acct_session_id"`     // 会话唯一 ID
+	FramedIP         string `json:"framed_ip,omitempty"` // 用户分配的 IP 地址
+	CallingStationID string `json:"calling_station_id"`  // MAC 地址
+	CalledStationID  string `json:"called_station_id"`   // 接入点标识
+	NasPort          int    `json:"nas_port"`            // NAS 端口号
+	NasPortType      string `json:"nas_port_type"`       // 端口类型
+
 }
 
 type KafkaAccounter struct {
@@ -38,7 +41,7 @@ func NewKafkaAccounter(brokers []string, topic string) (*KafkaAccounter, error) 
 	config.Producer.Return.Successes = true
 
 	// Enable logging
-	sarama.Logger = log.WithField("component", "sarama")
+	// sarama.Logger = log.WithField("component", "sarama")
 
 	log.WithFields(logrus.Fields{
 		"brokers": brokers,
@@ -61,13 +64,10 @@ func NewKafkaAccounter(brokers []string, topic string) (*KafkaAccounter, error) 
 
 func (k *KafkaAccounter) SendAccountingData(data *AccountingData) error {
 	logger := k.log.WithFields(logrus.Fields{
-		"username":    data.Username,
-		"session_id":  data.SessionID,
-		"nas_ip":      data.NASIPAddr,
-		"bytes_in":    data.BytesIn,
-		"bytes_out":   data.BytesOut,
-		"packets_in":  data.PacketsIn,
-		"packets_out": data.PacketsOut,
+		"user_name":  data.UserName,
+		"event_type": data.EventType,
+		"session_id": data.AcctSessionID,
+		"nas_ip":     data.NASIPAddr,
 	})
 
 	jsonData, err := json.Marshal(data)
@@ -79,7 +79,7 @@ func (k *KafkaAccounter) SendAccountingData(data *AccountingData) error {
 	msg := &sarama.ProducerMessage{
 		Topic: k.topic,
 		Value: sarama.StringEncoder(jsonData),
-		Key:   sarama.StringEncoder(data.SessionID),
+		Key:   sarama.StringEncoder(data.AcctSessionID),
 	}
 
 	partition, offset, err := k.producer.SendMessage(msg)
@@ -101,6 +101,5 @@ func (k *KafkaAccounter) Close() error {
 		k.log.WithError(err).Error("Failed to close Kafka producer")
 		return fmt.Errorf("failed to close kafka producer: %w", err)
 	}
-	k.log.Info("Kafka producer closed successfully")
 	return nil
 }

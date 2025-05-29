@@ -3,23 +3,26 @@ server:
   nas_networks:
     - 192.168.1.0/24
     - 10.0.0.0/24
+    - 127.0.0.1
   # RADIUS shared secret
-  secret: "testing123"
+  secret: "IoT@radius.com"
   # Authentication ports
   auth_port: 1812
   # Accounting ports
   acct_port: 1813
+  # admin port for web interface
+  admin_port: 8880
 
 redis:
-  host: "localhost"
+  host: "192.168.1.30"
   port: 6379
   db: 0
-  password: ""
+  password: "thisredispass"
 
 kafka:
   brokers:
     - "localhost:9092"
-  topic: "radius_accounting"
+  topic: "radiusaccounting"
 
 logging:
   # Log file path

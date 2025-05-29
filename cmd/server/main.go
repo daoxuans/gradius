@@ -41,12 +41,15 @@ func main() {
 	log := logger.GetLogger()
 
 	// Initialize Redis authenticator
-	authenticator := auth.NewRedisAuthenticator(
+	authenticator, err := auth.NewRedisAuthenticator(
 		viper.GetString("redis.host"),
 		viper.GetString("redis.port"),
 		viper.GetString("redis.password"),
 		viper.GetInt("redis.db"),
 	)
+	if err != nil {
+		log.Fatalf("Error initializing Redis authenticator: %s", err)
+	}
 
 	// Initialize Kafka accounter
 	accounter, err := accounting.NewKafkaAccounter(
@@ -63,14 +66,17 @@ func main() {
 		log.Fatalf("Error initializing NAS IP validator: %s", err)
 	}
 
+	secret := viper.GetString("server.secret")
+	if secret == "" {
+		log.Fatal("RADIUS server secret is not configured")
+	}
+
 	// Create and start RADIUS server
-	adminAddr := fmt.Sprintf(":%d", viper.GetInt("server.admin_port"))
 	server := radius.NewServer(
-		viper.GetString("server.secret"),
+		secret,
 		authenticator,
 		accounter,
 		nasValidator,
-		adminAddr,
 	)
 
 	// Handle graceful shutdown
@@ -83,14 +89,16 @@ func main() {
 		if err := server.Shutdown(); err != nil {
 			log.Errorf("Error during shutdown: %v", err)
 		}
+		os.Exit(0)
 	}()
 
 	// Start server
 	authAddr := fmt.Sprintf(":%d", viper.GetInt("server.auth_port"))
 	acctAddr := fmt.Sprintf(":%d", viper.GetInt("server.acct_port"))
+	adminAddr := fmt.Sprintf(":%d", viper.GetInt("server.admin_port"))
 
-	log.Infof("Starting RADIUS server (auth: %s, acct: %s)", authAddr, acctAddr)
-	if err := server.ListenAndServe(authAddr, acctAddr); err != nil {
+	log.Infof("Starting RADIUS server (auth: %s, acct: %s, admin: %s)", authAddr, acctAddr, adminAddr)
+	if err := server.ListenAndServe(authAddr, acctAddr, adminAddr); err != nil {
 		log.Fatalf("Server error: %s", err)
 	}
 }

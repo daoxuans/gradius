@@ -26,7 +26,7 @@ type RedisAuthenticator struct {
 	log    *logrus.Logger
 }
 
-func NewRedisAuthenticator(host string, port string, password string, db int) *RedisAuthenticator {
+func NewRedisAuthenticator(host string, port string, password string, db int) (*RedisAuthenticator, error) {
 	log := logger.GetLogger()
 
 	client := redis.NewClient(&redis.Options{
@@ -39,14 +39,14 @@ func NewRedisAuthenticator(host string, port string, password string, db int) *R
 	ctx := context.Background()
 	if err := client.Ping(ctx).Err(); err != nil {
 		log.WithError(err).Error("Failed to connect to Redis")
-		return nil
+		return nil, fmt.Errorf("failed to connect to Redis: %w", err)
 	}
 
 	log.Info("Connected to Redis successfully")
 	return &RedisAuthenticator{
 		client: client,
 		log:    log,
-	}
+	}, nil
 }
 
 func (r *RedisAuthenticator) ValidateCredentials(username, password string, authType AuthType, chapChallenge, chapResponse []byte) (bool, error) {
@@ -114,5 +114,9 @@ func (r *RedisAuthenticator) ValidateMAC(macAddress string) (bool, error) {
 }
 
 func (r *RedisAuthenticator) Close() error {
-	return r.client.Close()
+	if err := r.client.Close(); err != nil {
+		r.log.WithError(err).Error("Failed to close Redis client")
+		return fmt.Errorf("failed to close redis client: %w", err)
+	}
+	return nil
 }

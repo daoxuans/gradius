@@ -1,16 +1,15 @@
 package admin
 
 import (
+	"context"
 	"encoding/json"
 	"gradius/internal/metrics"
 	"net/http"
-	"sync"
 )
 
 type AdminServer struct {
 	metrics *metrics.Metrics
 	server  *http.Server
-	mu      sync.RWMutex
 }
 
 func NewAdminServer(metrics *metrics.Metrics, addr string) *AdminServer {
@@ -76,6 +75,6 @@ func (a *AdminServer) Start() error {
 	return a.server.ListenAndServe()
 }
 
-func (a *AdminServer) Stop() error {
-	return a.server.Close()
+func (a *AdminServer) Shutdown(ctx context.Context) error {
+	return a.server.Shutdown(ctx)
 }
