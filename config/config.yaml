@@ -2,7 +2,7 @@ server:
   # NAS access points
   nas_networks:
     - 192.168.1.0/24
-    - 10.0.0.0/24
+    - 10.8.8.0/24
     - 127.0.0.1
   # RADIUS shared secret
   secret: "IoT@radius.com"
@@ -14,10 +14,10 @@ server:
   admin_port: 8880
 
 redis:
-  host: "192.168.1.30"
+  host: "localhost"
   port: 6379
   db: 0
-  password: "thisredispass"
+  password: "A4vSK1B18IcRPNmvEASgL3E955emH2hzmWdJd"
 
 kafka:
   brokers:
