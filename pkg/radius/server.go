@@ -11,6 +11,7 @@ import (
 	"gradius/internal/logger"
 	"gradius/internal/metrics"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -78,6 +79,18 @@ func (s *Server) handlePacket(w radius.ResponseWriter, r *radius.Request) {
 		return
 	}
 
+	if rfc2865.UserName_GetString(r.Packet) == "" {
+		logger.Warn("Missing User-Name attribute")
+		w.Write(r.Response(radius.CodeAccessReject))
+		return
+	}
+
+	// if rfc2869.MessageAuthenticator_Get(r.Packet) == nil {
+	// 	logger.Warn("Missing Message-Authenticator attribute")
+	// 	w.Write(r.Response(radius.CodeAccessReject))
+	// 	return
+	// }
+
 	switch r.Code {
 	case radius.CodeAccessRequest:
 		s.handleAccessRequest(w, r)
@@ -103,10 +116,12 @@ func (s *Server) handleAccessRequest(w radius.ResponseWriter, r *radius.Request)
 	var err error
 
 	// Check if this is a MAC authentication request
-	if callingStationID := rfc2865.CallingStationID_GetString(r.Packet); callingStationID == username {
-		logger = logger.WithField("mac", callingStationID)
+	callingStationID := rfc2865.CallingStationID_GetString(r.Packet)
+	MacAddr := strings.ReplaceAll(callingStationID, "-", ":")
+	if MacAddr == username {
+		logger = logger.WithField("mac", MacAddr)
 		logger.Info("Processing MAC authentication")
-		valid, err = s.authenticator.ValidateMAC(callingStationID)
+		valid, err = s.authenticator.ValidateMAC(MacAddr)
 	} else if chapChallenge := rfc2865.CHAPChallenge_Get(r.Packet); chapChallenge != nil {
 		// CHAP authentication
 		logger.Info("Processing CHAP authentication")
