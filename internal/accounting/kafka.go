@@ -9,23 +9,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// accounting.AccountingData 定义文件：kafka.go
-type AccountingData struct {
-	EventType        string `json:"event_type"`          // Start/Interim-Update/Stop
-	Timestamp        int64  `json:"timestamp"`           // Unix 时间戳（秒）
-	EventTimestamp   string `json:"event_timestamp"`     // ISO8601 UTC 时间
-	UserName         string `json:"user_name"`           // 用户名 => user_name
-	NasIdentifier    string `json:"nas_identifier"`      // NAS 设备标识
-	NASIPAddr        string `json:"nas_ip"`              // 原 "nas_ip_addr" => nas_ip
-	AcctSessionID    string `json:"acct_session_id"`     // 会话唯一 ID
-	FramedIP         string `json:"framed_ip,omitempty"` // 用户分配的 IP 地址
-	CallingStationID string `json:"calling_station_id"`  // MAC 地址
-	CalledStationID  string `json:"called_station_id"`   // 接入点标识
-	NasPort          int    `json:"nas_port"`            // NAS 端口号
-	NasPortType      string `json:"nas_port_type"`       // 端口类型
-
-}
-
 type KafkaAccounter struct {
 	producer sarama.SyncProducer
 	topic    string
@@ -39,9 +22,6 @@ func NewKafkaAccounter(brokers []string, topic string) (*KafkaAccounter, error) 
 	config.Producer.RequiredAcks = sarama.WaitForAll
 	config.Producer.Retry.Max = 5
 	config.Producer.Return.Successes = true
-
-	// Enable logging
-	// sarama.Logger = log.WithField("component", "sarama")
 
 	log.WithFields(logrus.Fields{
 		"brokers": brokers,

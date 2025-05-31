@@ -51,13 +51,28 @@ func main() {
 		log.Fatalf("Error initializing Redis authenticator: %s", err)
 	}
 
-	// Initialize Kafka accounter
-	accounter, err := accounting.NewKafkaAccounter(
-		viper.GetStringSlice("kafka.brokers"),
-		viper.GetString("kafka.topic"),
-	)
+	// accounter configuration
+	accountingConfig := make(map[string]interface{})
+	accountingType := viper.GetString("accounting_export.type")
+	accountingConfig["type"] = accountingType
+
+	switch accountingType {
+	case "kafka":
+		accountingConfig["brokers"] = viper.GetStringSlice("accounting_export.kafka.brokers")
+		accountingConfig["topic"] = viper.GetString("accounting_export.kafka.topic")
+	case "nats":
+		accountingConfig["url"] = viper.GetString("accounting_export.nats.url")
+		accountingConfig["subject"] = viper.GetString("accounting_export.nats.subject")
+	case "file":
+		log.Info("Using file logging for accounting data")
+	default:
+		log.Fatalf("Unsupported messaging middleware type: %s", accountingType)
+	}
+
+	// Initialize accounter
+	accounter, err := accounting.NewAccounter(accountingConfig)
 	if err != nil {
-		log.Fatalf("Error initializing Kafka accounter: %s", err)
+		log.Fatalf("Error initializing accounter: %s", err)
 	}
 
 	// Initialize NAS IP validator

@@ -24,7 +24,7 @@ import (
 type Server struct {
 	secret        string
 	authenticator *auth.RedisAuthenticator
-	accounter     *accounting.KafkaAccounter
+	accounter     accounting.Accounter
 	nasValidator  *auth.NASIPValidator
 	metrics       *metrics.Metrics
 	adminServer   *admin.AdminServer
@@ -33,7 +33,7 @@ type Server struct {
 	log           *logrus.Logger
 }
 
-func NewServer(secret string, authenticator *auth.RedisAuthenticator, accounter *accounting.KafkaAccounter, nasValidator *auth.NASIPValidator) *Server {
+func NewServer(secret string, authenticator *auth.RedisAuthenticator, accounter accounting.Accounter, nasValidator *auth.NASIPValidator) *Server {
 	metrics := metrics.New()
 	s := &Server{
 		secret:        secret,

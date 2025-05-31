@@ -19,10 +19,15 @@ redis:
   db: 0
   password: "A4vSK1B18IcRPNmvEASgL3E955emH2hzmWdJd"
 
-kafka:
-  brokers:
-    - "localhost:9092"
-  topic: "radiusaccounting"
+accounting_export:
+  type: "file"
+  kafka:
+    brokers:
+      - "localhost:9092"
+    topic: "radiusaccounting"
+  nats:
+    url: "nats://localhost:4222"
+    subject: "radiusaccounting"
 
 logging:
   # Log file path
