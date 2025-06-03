@@ -15,11 +15,11 @@ import (
 
 func main() {
 	// Load configuration
-	viper.SetConfigName("config")
+	viper.SetConfigName("gradius")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("/etc/gradius/")
 	viper.AddConfigPath("$HOME/.gradius")
-	viper.AddConfigPath("./config")
+	viper.AddConfigPath(".")
 
 	if err := viper.ReadInConfig(); err != nil {
 		fmt.Printf("Error reading config file: %s\n", err)
