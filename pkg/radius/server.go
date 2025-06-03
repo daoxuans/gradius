@@ -5,9 +5,9 @@ import (
 	"crypto/hmac"
 	"crypto/md5"
 	"fmt"
-	"gradius/internal/accounting"
 	"gradius/internal/admin"
 	"gradius/internal/auth"
+	"gradius/internal/exporter"
 	"gradius/internal/logger"
 	"gradius/internal/metrics"
 	"net/http"
@@ -24,7 +24,7 @@ import (
 type Server struct {
 	secret        string
 	authenticator *auth.RedisAuthenticator
-	accounter     accounting.Accounter
+	exporter      exporter.MessageExporter
 	nasValidator  *auth.NASIPValidator
 	metrics       *metrics.Metrics
 	adminServer   *admin.AdminServer
@@ -33,12 +33,12 @@ type Server struct {
 	log           *logrus.Logger
 }
 
-func NewServer(secret string, authenticator *auth.RedisAuthenticator, accounter accounting.Accounter, nasValidator *auth.NASIPValidator) *Server {
+func NewServer(secret string, authenticator *auth.RedisAuthenticator, exporter exporter.MessageExporter, nasValidator *auth.NASIPValidator) *Server {
 	metrics := metrics.New()
 	s := &Server{
 		secret:        secret,
 		authenticator: authenticator,
-		accounter:     accounter,
+		exporter:      exporter,
 		nasValidator:  nasValidator,
 		metrics:       metrics,
 		adminServer:   nil,
@@ -65,6 +65,7 @@ func sendAuthResponse(w radius.ResponseWriter, r *radius.Request, code radius.Co
 	rfc2869.MessageAuthenticator_Set(resp, authenticator)
 	w.Write(resp)
 }
+
 func (s *Server) handlePacket(w radius.ResponseWriter, r *radius.Request) {
 	nasIP := rfc2865.NASIPAddress_Get(r.Packet)
 	logger := s.log.WithFields(logrus.Fields{
@@ -115,8 +116,18 @@ func (s *Server) handleAccessRequest(w radius.ResponseWriter, r *radius.Request)
 	var valid bool
 	var err error
 
-	// Check if this is a MAC authentication request
+	framedIPAddr := rfc2865.FramedIPAddress_Get(r.Packet).String()
 	callingStationID := rfc2865.CallingStationID_GetString(r.Packet)
+
+	authData := &exporter.AuthingData{
+		Timestamp:        time.Now().UTC().Unix(),
+		UserName:         username,
+		FramedIP:         framedIPAddr,
+		CallingStationID: callingStationID,
+		NASIPAddr:        nasip.String(),
+	}
+
+	// Check if this is a MAC authentication request
 	MacAddr := strings.ReplaceAll(callingStationID, "-", ":")
 	if MacAddr == username {
 		logger = logger.WithField("mac", MacAddr)
@@ -127,7 +138,9 @@ func (s *Server) handleAccessRequest(w radius.ResponseWriter, r *radius.Request)
 		logger.Info("Processing CHAP authentication")
 		chapPassword := rfc2865.CHAPPassword_Get(r.Packet)
 		if chapPassword == nil {
-			logger.Warn("Missing CHAP password")
+			authData.IsSuccess = false
+			authData.FailureReason = "Missing CHAP password"
+			s.exporter.SendAuthingData(authData)
 			s.metrics.RecordAuthRequest(false, time.Since(start))
 			sendAuthResponse(w, r, radius.CodeAccessReject, s.secret)
 			return
@@ -141,18 +154,24 @@ func (s *Server) handleAccessRequest(w radius.ResponseWriter, r *radius.Request)
 	}
 
 	if err != nil {
-		logger.WithError(err).Error("Authentication error")
+		authData.IsSuccess = false
+		authData.FailureReason = err.Error()
+		s.exporter.SendAuthingData(authData)
 		s.metrics.RecordAuthRequest(false, time.Since(start))
 		sendAuthResponse(w, r, radius.CodeAccessReject, s.secret)
 		return
 	}
 
 	if valid {
-		logger.Info("Authentication successful")
+		authData.IsSuccess = true
+		authData.FailureReason = ""
+		s.exporter.SendAuthingData(authData)
 		s.metrics.RecordAuthRequest(true, time.Since(start))
 		sendAuthResponse(w, r, radius.CodeAccessAccept, s.secret)
 	} else {
-		logger.Info("Authentication failed")
+		authData.IsSuccess = false
+		authData.FailureReason = "Invalid credentials"
+		s.exporter.SendAuthingData(authData)
 		s.metrics.RecordAuthRequest(false, time.Since(start))
 		sendAuthResponse(w, r, radius.CodeAccessReject, s.secret)
 	}
@@ -198,7 +217,7 @@ func (s *Server) handleAccountingRequest(w radius.ResponseWriter, r *radius.Requ
 		eventType = "Unknown"
 	}
 
-	acctData := &accounting.AccountingData{
+	acctData := &exporter.AccountingData{
 		EventType:        eventType,
 		Timestamp:        timestamp,
 		EventTimestamp:   eventTimestamp,
@@ -213,7 +232,7 @@ func (s *Server) handleAccountingRequest(w radius.ResponseWriter, r *radius.Requ
 		NasPortType:      nasPortType,
 	}
 
-	if err := s.accounter.SendAccountingData(acctData); err != nil {
+	if err := s.exporter.SendAccountingData(acctData); err != nil {
 		logger.WithError(err).Error("Failed to send accounting data")
 		s.metrics.RecordAcctRequest(false, time.Since(start))
 	} else {
@@ -283,10 +302,10 @@ func (s *Server) Shutdown() error {
 		s.log.Info("Release authenticator")
 	}
 
-	if err := s.accounter.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("error closing accounter: %w", err))
+	if err := s.exporter.Close(); err != nil {
+		errs = append(errs, fmt.Errorf("error closing exporter: %w", err))
 	} else {
-		s.log.Info("Release accounter")
+		s.log.Info("Release exporter")
 	}
 
 	if err := s.adminServer.Shutdown(ctx); err != nil {

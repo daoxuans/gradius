@@ -1,12 +1,23 @@
-package accounting
+package exporter
 
 import (
 	"fmt"
 )
 
-type Accounter interface {
+type MessageExporter interface {
 	SendAccountingData(data *AccountingData) error
+	SendAuthingData(data *AuthingData) error
 	Close() error
+}
+
+type AuthingData struct {
+	Timestamp        int64  `json:"timestamp"`           // Unix 时间戳（秒）
+	UserName         string `json:"user_name"`           // 用户名 => user_name
+	FramedIP         string `json:"framed_ip,omitempty"` // 用户分配的 IP 地址
+	CallingStationID string `json:"calling_station_id"`  // MAC 地址
+	NASIPAddr        string `json:"nas_ip"`              // 原 "nas_ip_addr" => nas_ip
+	IsSuccess        bool   `json:"success"`             // 是否成功
+	FailureReason    string `json:"reason"`              // 失败原因
 }
 
 type AccountingData struct {
@@ -24,7 +35,7 @@ type AccountingData struct {
 	NasPortType      string `json:"nas_port_type"`       // 端口类型
 }
 
-func NewAccounter(config map[string]interface{}) (Accounter, error) {
+func NewMessageExporter(config map[string]interface{}) (MessageExporter, error) {
 	middlewareType, ok := config["type"].(string)
 	if !ok {
 		return nil, fmt.Errorf("invalid middleware type config")
@@ -32,7 +43,7 @@ func NewAccounter(config map[string]interface{}) (Accounter, error) {
 
 	switch middlewareType {
 	case "file":
-		return NewFileAccounter()
+		return NewFileMessageExporter()
 
 	case "kafka":
 		brokers, ok := config["brokers"].([]string)
@@ -43,7 +54,7 @@ func NewAccounter(config map[string]interface{}) (Accounter, error) {
 		if !ok {
 			return nil, fmt.Errorf("invalid kafka topic config")
 		}
-		return NewKafkaAccounter(brokers, topic)
+		return NewKafkaMessageExporter(brokers, topic)
 
 	case "nats":
 		url, ok := config["url"].(string)
@@ -54,7 +65,7 @@ func NewAccounter(config map[string]interface{}) (Accounter, error) {
 		if !ok {
 			return nil, fmt.Errorf("invalid nats subject config")
 		}
-		return NewNatsAccounter(url, subject)
+		return NewNatsMessageExporter(url, subject)
 
 	default:
 		return nil, fmt.Errorf("unsupported middleware type: %s", middlewareType)

@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"gradius/internal/accounting"
 	"gradius/internal/auth"
+	"gradius/internal/exporter"
 	"gradius/internal/logger"
 	"gradius/pkg/radius"
 	"os"
@@ -51,28 +51,28 @@ func main() {
 		log.Fatalf("Error initializing Redis authenticator: %s", err)
 	}
 
-	// accounter configuration
-	accountingConfig := make(map[string]interface{})
-	accountingType := viper.GetString("accounting_export.type")
-	accountingConfig["type"] = accountingType
+	// exporter configuration
+	exporterConfig := make(map[string]interface{})
+	exporterType := viper.GetString("message_export.type")
+	exporterConfig["type"] = exporterType
 
-	switch accountingType {
+	switch exporterType {
 	case "kafka":
-		accountingConfig["brokers"] = viper.GetStringSlice("accounting_export.kafka.brokers")
-		accountingConfig["topic"] = viper.GetString("accounting_export.kafka.topic")
+		exporterConfig["brokers"] = viper.GetStringSlice("message_export.kafka.brokers")
+		exporterConfig["topic"] = viper.GetString("message_export.kafka.topic")
 	case "nats":
-		accountingConfig["url"] = viper.GetString("accounting_export.nats.url")
-		accountingConfig["subject"] = viper.GetString("accounting_export.nats.subject")
+		exporterConfig["url"] = viper.GetString("message_export.nats.url")
+		exporterConfig["subject"] = viper.GetString("message_export.nats.subject")
 	case "file":
-		log.Info("Using file logging for accounting data")
+		log.Info("Using file logging for AAA data")
 	default:
-		log.Fatalf("Unsupported messaging middleware type: %s", accountingType)
+		log.Fatalf("Unsupported messaging middleware type: %s", exporterType)
 	}
 
-	// Initialize accounter
-	accounter, err := accounting.NewAccounter(accountingConfig)
+	// Initialize exporter
+	exporter, err := exporter.NewMessageExporter(exporterConfig)
 	if err != nil {
-		log.Fatalf("Error initializing accounter: %s", err)
+		log.Fatalf("Error initializing exporter: %s", err)
 	}
 
 	// Initialize NAS IP validator
@@ -90,7 +90,7 @@ func main() {
 	server := radius.NewServer(
 		secret,
 		authenticator,
-		accounter,
+		exporter,
 		nasValidator,
 	)
 

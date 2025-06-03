@@ -1,4 +1,4 @@
-package accounting
+package exporter
 
 import (
 	"encoding/json"
@@ -9,13 +9,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type KafkaAccounter struct {
+type KafkaMessageExporter struct {
 	producer sarama.SyncProducer
 	topic    string
 	log      *logrus.Logger
 }
 
-func NewKafkaAccounter(brokers []string, topic string) (*KafkaAccounter, error) {
+func NewKafkaMessageExporter(brokers []string, topic string) (*KafkaMessageExporter, error) {
 	log := logger.GetLogger()
 
 	config := sarama.NewConfig()
@@ -35,14 +35,49 @@ func NewKafkaAccounter(brokers []string, topic string) (*KafkaAccounter, error) 
 	}
 
 	log.Info("Successfully connected to Kafka")
-	return &KafkaAccounter{
+	return &KafkaMessageExporter{
 		producer: producer,
 		topic:    topic,
 		log:      log,
 	}, nil
 }
 
-func (k *KafkaAccounter) SendAccountingData(data *AccountingData) error {
+// SendAuthingData sends authentication data to Kafka
+func (k *KafkaMessageExporter) SendAuthingData(data *AuthingData) error {
+	logger := k.log.WithFields(logrus.Fields{
+		"user_name": data.UserName,
+		"nas_ip":    data.NASIPAddr,
+	})
+
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		logger.WithError(err).Error("Failed to marshal authing data")
+		return fmt.Errorf("failed to marshal authing data: %w", err)
+	}
+
+	msg := &sarama.ProducerMessage{
+		Topic: k.topic,
+		Value: sarama.StringEncoder(jsonData),
+		Key:   sarama.StringEncoder(data.UserName),
+	}
+
+	partition, offset, err := k.producer.SendMessage(msg)
+	if err != nil {
+		logger.WithError(err).Error("Failed to send message to Kafka")
+		return fmt.Errorf("failed to send message to kafka: %w", err)
+	}
+
+	logger.WithFields(logrus.Fields{
+		"partition": partition,
+		"offset":    offset,
+	}).Debug("Successfully sent authing data to Kafka")
+
+	return nil
+}
+
+// SendAccountingData sends accounting data to Kafka
+
+func (k *KafkaMessageExporter) SendAccountingData(data *AccountingData) error {
 	logger := k.log.WithFields(logrus.Fields{
 		"user_name":  data.UserName,
 		"event_type": data.EventType,
@@ -76,7 +111,7 @@ func (k *KafkaAccounter) SendAccountingData(data *AccountingData) error {
 	return nil
 }
 
-func (k *KafkaAccounter) Close() error {
+func (k *KafkaMessageExporter) Close() error {
 	if err := k.producer.Close(); err != nil {
 		k.log.WithError(err).Error("Failed to close Kafka producer")
 		return fmt.Errorf("failed to close kafka producer: %w", err)
