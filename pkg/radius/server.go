@@ -196,6 +196,8 @@ func (s *Server) handleAccountingRequest(w radius.ResponseWriter, r *radius.Requ
 	nasPort := int(rfc2865.NASPort_Get(r.Packet))
 	nasPortType := rfc2865.NASPortType_Get(r.Packet).String()
 	nasIdentifier := rfc2865.NASIdentifier_GetString(r.Packet)
+	inputOctets := rfc2866.AcctInputOctets_Get(r.Packet)
+	outputOctets := rfc2866.AcctOutputOctets_Get(r.Packet)
 
 	now := time.Now().UTC()
 	timestamp := now.Unix()
@@ -230,6 +232,8 @@ func (s *Server) handleAccountingRequest(w radius.ResponseWriter, r *radius.Requ
 		CalledStationID:  calledStationID,
 		NasPort:          nasPort,
 		NasPortType:      nasPortType,
+		InputOctets:      uint32(inputOctets),
+		OutputOctets:     uint32(outputOctets),
 	}
 
 	if err := s.exporter.SendAccountingData(acctData); err != nil {
