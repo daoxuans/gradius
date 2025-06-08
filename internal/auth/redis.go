@@ -120,3 +120,57 @@ func (r *RedisAuthenticator) Close() error {
 	}
 	return nil
 }
+
+func (r *RedisAuthenticator) ForceDisconnectUser(username string) error {
+	ctx := context.Background()
+	logger := r.log.WithField("username", username)
+
+	// Check if user exists
+	userKey := "user:" + username
+	exists, err := r.client.Exists(ctx, userKey).Result()
+	if err != nil {
+		logger.WithError(err).Error("Failed to check user existence")
+		return fmt.Errorf("failed to check user existence: %w", err)
+	}
+	if exists == 0 {
+		logger.Info("User does not exist")
+		return nil
+	}
+
+	// Delete user
+	if _, err := r.client.Del(ctx, userKey).Result(); err != nil {
+		logger.WithError(err).Error("Failed to delete user")
+		return fmt.Errorf("failed to delete user: %w", err)
+	}
+
+	logger.Infof("Successfully forced disconnect for user")
+	return nil
+}
+
+func (r *RedisAuthenticator) ForceDisconnectMacAddress(macAddress string) error {
+	ctx := context.Background()
+	mac := strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(macAddress, ":", ""), "-", ""))
+
+	logger := r.log.WithField("mac", mac)
+
+	// Check if MAC exists
+	macKey := "mac:" + mac
+	exists, err := r.client.Exists(ctx, macKey).Result()
+	if err != nil {
+		logger.WithError(err).Error("Failed to check MAC existence")
+		return fmt.Errorf("failed to check MAC existence: %w", err)
+	}
+	if exists == 0 {
+		logger.Info("MAC does not exist")
+		return nil
+	}
+
+	// Delete MAC
+	if _, err := r.client.Del(ctx, macKey).Result(); err != nil {
+		logger.WithError(err).Error("Failed to delete MAC")
+		return fmt.Errorf("failed to delete MAC: %w", err)
+	}
+
+	logger.Info("Successfully forced disconnect for MAC")
+	return nil
+}

@@ -10,6 +10,7 @@ import (
 	"gradius/internal/exporter"
 	"gradius/internal/logger"
 	"gradius/internal/metrics"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -71,7 +72,7 @@ func (s *Server) handlePacket(w radius.ResponseWriter, r *radius.Request) {
 	logger := s.log.WithFields(logrus.Fields{
 		"code":   r.Code.String(),
 		"client": r.RemoteAddr.String(),
-		"nas_ip": nasIP,
+		"nas_ip": nasIP.String(),
 	})
 
 	if !s.nasValidator.IsAllowed(nasIP) {
@@ -106,11 +107,11 @@ func (s *Server) handlePacket(w radius.ResponseWriter, r *radius.Request) {
 func (s *Server) handleAccessRequest(w radius.ResponseWriter, r *radius.Request) {
 	start := time.Now()
 
-	username := rfc2865.UserName_GetString(r.Packet)
-	nasip := rfc2865.NASIPAddress_Get(r.Packet)
+	userName := rfc2865.UserName_GetString(r.Packet)
+	nasIP := rfc2865.NASIPAddress_Get(r.Packet)
 	logger := s.log.WithFields(logrus.Fields{
-		"username": username,
-		"nas":      nasip.String(),
+		"username": userName,
+		"nas":      nasIP.String(),
 	})
 
 	var valid bool
@@ -121,15 +122,15 @@ func (s *Server) handleAccessRequest(w radius.ResponseWriter, r *radius.Request)
 
 	authData := &exporter.AuthingData{
 		Timestamp:        time.Now().UTC().Unix(),
-		UserName:         username,
+		UserName:         userName,
 		FramedIP:         framedIPAddr,
 		CallingStationID: callingStationID,
-		NASIPAddr:        nasip.String(),
+		NASIPAddr:        nasIP.String(),
 	}
 
 	// Check if this is a MAC authentication request
 	MacAddr := strings.ReplaceAll(callingStationID, "-", ":")
-	if MacAddr == username {
+	if MacAddr == userName {
 		logger = logger.WithField("mac", MacAddr)
 		logger.Info("Processing MAC authentication")
 		valid, err = s.authenticator.ValidateMAC(MacAddr)
@@ -145,12 +146,12 @@ func (s *Server) handleAccessRequest(w radius.ResponseWriter, r *radius.Request)
 			sendAuthResponse(w, r, radius.CodeAccessReject, s.secret)
 			return
 		}
-		valid, err = s.authenticator.ValidateCredentials(username, "", auth.CHAP, chapChallenge, chapPassword)
+		valid, err = s.authenticator.ValidateCredentials(userName, "", auth.CHAP, chapChallenge, chapPassword)
 	} else {
 		// PAP authentication
 		logger.Info("Processing PAP authentication")
 		password := rfc2865.UserPassword_GetString(r.Packet)
-		valid, err = s.authenticator.ValidateCredentials(username, password, auth.PAP, nil, nil)
+		valid, err = s.authenticator.ValidateCredentials(userName, password, auth.PAP, nil, nil)
 	}
 
 	if err != nil {
@@ -181,9 +182,9 @@ func (s *Server) handleAccountingRequest(w radius.ResponseWriter, r *radius.Requ
 	start := time.Now()
 
 	nasIPAddr := rfc2865.NASIPAddress_Get(r.Packet).String()
-	username := rfc2865.UserName_GetString(r.Packet)
+	userName := rfc2865.UserName_GetString(r.Packet)
 	logger := s.log.WithFields(logrus.Fields{
-		"username": username,
+		"username": userName,
 		"nas":      nasIPAddr,
 	})
 
@@ -223,7 +224,7 @@ func (s *Server) handleAccountingRequest(w radius.ResponseWriter, r *radius.Requ
 		EventType:        eventType,
 		Timestamp:        timestamp,
 		EventTimestamp:   eventTimestamp,
-		UserName:         username,
+		UserName:         userName,
 		NasIdentifier:    nasIdentifier,
 		NASIPAddr:        nasIPAddr,
 		AcctSessionID:    sessionID,
@@ -294,6 +295,58 @@ func (s *Server) ListenAndServe(authAddr, acctAddr, adminAddr string) error {
 	return <-errChan
 }
 
+func (s *Server) SendDisconnectRequest(nasIP string, userName string, macAddr string) error {
+	start := time.Now()
+
+	logger := s.log.WithFields(logrus.Fields{
+		"username": userName,
+		"nas":      nasIP,
+		"mac":      macAddr,
+	})
+
+	nasIPAddr := net.ParseIP(nasIP)
+	if nasIPAddr == nil || !s.nasValidator.IsAllowed(nasIPAddr) {
+		logger.Warn("Unauthorized NAS IP address for CoA")
+		s.metrics.RecordCoARequest(false, time.Since(start))
+		return fmt.Errorf("unauthorized NAS IP")
+	}
+
+	// Create Disconnect-Request packet
+	packet := radius.New(radius.CodeDisconnectRequest, []byte(s.secret))
+	if userName != "" {
+		rfc2865.UserName_SetString(packet, userName)
+	}
+	if macAddr != "" {
+		rfc2865.CallingStationID_SetString(packet, macAddr)
+	}
+	rfc2865.NASIPAddress_Set(packet, net.ParseIP(nasIP))
+
+	// Send to NAS
+	ctx := context.Background()
+	_, err := radius.Exchange(ctx, packet, nasIP+":3799")
+	if err != nil {
+		logger.WithError(err).Error("Failed to send Disconnect-Request")
+		s.metrics.RecordCoARequest(false, time.Since(start))
+		return err
+	}
+
+	// Also force disconnect in Redis
+	var disconnectErr error
+	if macAddr != "" {
+		disconnectErr = s.authenticator.ForceDisconnectMacAddress(macAddr)
+	} else if userName != "" {
+		disconnectErr = s.authenticator.ForceDisconnectUser(userName)
+	}
+
+	if disconnectErr != nil {
+		logger.WithError(disconnectErr).Error("Failed to force disconnect in Redis")
+	}
+
+	logger.Info("Successfully sent Disconnect-Request")
+	s.metrics.RecordCoARequest(true, time.Since(start))
+	return nil
+}
+
 func (s *Server) Shutdown() error {
 	var errs []error
 
@@ -328,6 +381,7 @@ func (s *Server) Shutdown() error {
 	} else {
 		s.log.Info("Closed auth server")
 	}
+
 	if len(errs) > 0 {
 		return fmt.Errorf("shutdown errors: %v", errs)
 	}
