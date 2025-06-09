@@ -15,6 +15,7 @@ type AuthingData struct {
 	UserName         string `json:"user_name"`           // 用户名 => user_name
 	FramedIP         string `json:"framed_ip,omitempty"` // 用户分配的 IP 地址
 	CallingStationID string `json:"calling_station_id"`  // MAC 地址
+	CalledStationID  string `json:"called_station_id"`   // 接入点标识
 	NASIPAddr        string `json:"nas_ip"`              // 原 "nas_ip_addr" => nas_ip
 	IsSuccess        bool   `json:"success"`             // 是否成功
 	FailureReason    string `json:"reason"`              // 失败原因

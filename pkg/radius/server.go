@@ -119,12 +119,14 @@ func (s *Server) handleAccessRequest(w radius.ResponseWriter, r *radius.Request)
 
 	framedIPAddr := rfc2865.FramedIPAddress_Get(r.Packet).String()
 	callingStationID := rfc2865.CallingStationID_GetString(r.Packet)
+	calledStationID := rfc2865.CalledStationID_GetString(r.Packet)
 
 	authData := &exporter.AuthingData{
 		Timestamp:        time.Now().UTC().Unix(),
 		UserName:         userName,
 		FramedIP:         framedIPAddr,
 		CallingStationID: callingStationID,
+		CalledStationID:  calledStationID,
 		NASIPAddr:        nasIP.String(),
 	}
 
