@@ -5,7 +5,7 @@ import (
 	"gradius/internal/auth"
 	"gradius/internal/exporter"
 	"gradius/internal/logger"
-	"gradius/pkg/radius"
+	"gradius/radius"
 	"os"
 	"os/signal"
 	"syscall"
