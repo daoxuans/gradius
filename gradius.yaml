@@ -31,7 +31,7 @@ message_export:
 
 logging:
   # Log file path
-  file: "/var/log/gradius/radius.log"
+  file: "/var/log/gradius/gradius.log"
   # Log level (debug, info, warn, error)
   level: "info"
   # Max size in MB before rotation
