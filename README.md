@@ -14,11 +14,11 @@ radius服务，包括认证和计费，具体如下：
 #### **2. redis用户数据举例**
 数据都在db0中，两种存储形式：
 1. 用户名和密码存储在redis中，格式为：`user:username password`
-2. mac地址和认证标志位存储在redis中，格式为：`mac:mac_address flag`
+2. mac地址和认证标志位存储在redis中，格式为：`mac:mac_address username`
 ```
 user:18694960921 123456
 user:admin 123456
-mac:c69cd2ad608c 1       # C69CD2AD608C为mac地址，自动移除: 和 - 符号
+mac:c69cd2ad608c 18694960921       # C69CD2AD608C为mac地址，自动移除: 和 - 符号
 ```
 来自MAC认证的请求会去查mac地址是否存在，成功则返回认证成功，失败则返回认证失败。
 来自PAP/CHAP认证的请求会去查用户名和密码是否匹配，成功则返回认证成功，失败则返回认证失败。
