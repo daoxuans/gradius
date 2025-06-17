@@ -1,14 +1,14 @@
-build: buildlinux
+default: build
 
-buildwin64:
-	-rm ./bin/gradiuswin64.exe
-	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o ./bin/gradiuswin64.exe ./cmds/gradius/main.go
-	-upx -9 ./bin/gradiuswin64.exe
+buildarm64:
+	-rm ./bin/gradius.arm64
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o ./bin/gradius.arm64 ./cmds/gradius/main.go
+	-upx -9 ./bin/gradius.arm64
 
-buildlinux:
-	-rm ./bin/gradiuslinux
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ./bin/gradiuslinux ./cmds/gradius/main.go
-	-upx -9 ./bin/gradiuslinux
+build:
+	-rm ./bin/gradius
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ./bin/gradius ./cmds/gradius/main.go
+	-upx -9 ./bin/gradius
 
 clean:
 	-rm ./bin -rf
