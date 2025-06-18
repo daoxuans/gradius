@@ -12,7 +12,6 @@ import (
 	"gradius/internal/metrics"
 	"net"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -120,6 +119,7 @@ func (s *Server) handleAccessRequest(w radius.ResponseWriter, r *radius.Request)
 	framedIPAddr := rfc2865.FramedIPAddress_Get(r.Packet).String()
 	callingStationID := rfc2865.CallingStationID_GetString(r.Packet)
 	calledStationID := rfc2865.CalledStationID_GetString(r.Packet)
+	serviceType := rfc2865.ServiceType_Get(r.Packet)
 
 	authData := &exporter.AuthingData{
 		Timestamp:        time.Now().UTC().Unix(),
@@ -131,11 +131,10 @@ func (s *Server) handleAccessRequest(w radius.ResponseWriter, r *radius.Request)
 	}
 
 	// Check if this is a MAC authentication request
-	MacAddr := strings.ReplaceAll(callingStationID, "-", ":")
-	if MacAddr == userName {
-		logger = logger.WithField("mac", MacAddr)
+	if serviceType == rfc2865.ServiceType_Value_CallCheck {
+		logger = logger.WithField("mac", callingStationID)
 		logger.Info("Processing MAC authentication")
-		valid, err = s.authenticator.ValidateMAC(MacAddr)
+		valid, err = s.authenticator.ValidateMAC(userName)
 	} else if chapChallenge := rfc2865.CHAPChallenge_Get(r.Packet); chapChallenge != nil {
 		// CHAP authentication
 		logger.Info("Processing CHAP authentication")
