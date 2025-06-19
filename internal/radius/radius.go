@@ -12,6 +12,7 @@ import (
 	"gradius/internal/metrics"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -103,6 +104,18 @@ func (s *Server) handlePacket(w radius.ResponseWriter, r *radius.Request) {
 	}
 }
 
+func isMACBasedAuth(packet *radius.Packet) bool {
+	if rfc2865.ServiceType_Get(packet) == rfc2865.ServiceType_Value_CallCheck {
+		return true
+	}
+
+	callingStationID := rfc2865.CallingStationID_GetString(packet)
+	username := rfc2865.UserName_GetString(packet)
+
+	normalizedMAC := strings.ReplaceAll(callingStationID, "-", ":")
+	return normalizedMAC == username
+}
+
 func (s *Server) handleAccessRequest(w radius.ResponseWriter, r *radius.Request) {
 	start := time.Now()
 
@@ -119,7 +132,6 @@ func (s *Server) handleAccessRequest(w radius.ResponseWriter, r *radius.Request)
 	framedIPAddr := rfc2865.FramedIPAddress_Get(r.Packet).String()
 	callingStationID := rfc2865.CallingStationID_GetString(r.Packet)
 	calledStationID := rfc2865.CalledStationID_GetString(r.Packet)
-	serviceType := rfc2865.ServiceType_Get(r.Packet)
 
 	authData := &exporter.AuthingData{
 		Timestamp:        time.Now().UTC().Unix(),
@@ -131,7 +143,7 @@ func (s *Server) handleAccessRequest(w radius.ResponseWriter, r *radius.Request)
 	}
 
 	// Check if this is a MAC authentication request
-	if serviceType == rfc2865.ServiceType_Value_CallCheck {
+	if isMACBasedAuth(r.Packet) {
 		logger = logger.WithField("mac", callingStationID)
 		logger.Info("Processing MAC authentication")
 		valid, err = s.authenticator.ValidateMAC(userName)
