@@ -2,6 +2,7 @@ package exporter
 
 import (
 	"fmt"
+	"gradius/internal/logger"
 )
 
 type MessageExporter interface {
@@ -44,6 +45,8 @@ func NewMessageExporter(config map[string]interface{}) (MessageExporter, error) 
 		return nil, fmt.Errorf("invalid middleware type config")
 	}
 
+	log := logger.GetLogger()
+
 	switch middlewareType {
 	case "file":
 		return NewFileMessageExporter()
@@ -57,7 +60,14 @@ func NewMessageExporter(config map[string]interface{}) (MessageExporter, error) 
 		if !ok {
 			return nil, fmt.Errorf("invalid kafka topic config")
 		}
-		return NewKafkaMessageExporter(brokers, topic)
+
+		// Try to connect to Kafka
+		exporter, err := NewKafkaMessageExporter(brokers, topic)
+		if err != nil {
+			log.Warnf("Falling back to file exporter from Kafka")
+			return NewFileMessageExporter()
+		}
+		return exporter, nil
 
 	case "nats":
 		url, ok := config["url"].(string)
@@ -68,7 +78,14 @@ func NewMessageExporter(config map[string]interface{}) (MessageExporter, error) 
 		if !ok {
 			return nil, fmt.Errorf("invalid nats subject config")
 		}
-		return NewNatsMessageExporter(url, subject)
+
+		// Try to connect to NATS
+		exporter, err := NewNatsMessageExporter(url, subject)
+		if err != nil {
+			log.Warnf("Falling back to file exporter from NATS")
+			return NewFileMessageExporter()
+		}
+		return exporter, nil
 
 	default:
 		return nil, fmt.Errorf("unsupported middleware type: %s", middlewareType)
