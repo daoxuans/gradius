@@ -11,7 +11,7 @@ server:
   # Accounting ports
   acct_port: 1813
   # admin port for web interface
-  admin_port: 8880
+  admin_port: 8881
 
 redis:
   host: "localhost"
