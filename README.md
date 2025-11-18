@@ -50,5 +50,6 @@ mac:c69cd2ad608c 18694960921       # C69CD2AD608C为mac地址，自动移除: �
 | `nas_ip`             | string   | ✔️       | NAS IP 地址                       | `"192.168.1.50"`                      |
 | `framed_ip`              | string   | ✔️       | 用户分配的 IP 地址                | `"192.168.200.108"`                   |
 | `calling_station_id`     | string   | ✔️       | 用户 MAC 地址                     | `"C6-9C-D2-AD-60-8C"`                 |
+| `called_station_id`      | string   | ✔️       | 接入点标识                        | `"94-3B-B0-2E-C3-B0:H3C-NAC-Dot1X"`   |
 | `success`               | bool  | ✔️       | 认证成功                        | `false`                             |
 | `reason`          | string   | ✔️       | 失败原因，成功为空                          | `"Invalid credentials"`                    |

@@ -67,6 +67,20 @@ func sendAuthResponse(w radius.ResponseWriter, r *radius.Request, code radius.Co
 	w.Write(resp)
 }
 
+func packetSourceIP(r *radius.Request) net.IP {
+	if r == nil || r.RemoteAddr == nil {
+		return nil
+	}
+	if addr, ok := r.RemoteAddr.(*net.UDPAddr); ok {
+		return addr.IP
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr.String())
+	if err != nil {
+		return nil
+	}
+	return net.ParseIP(host)
+}
+
 func (s *Server) handlePacket(w radius.ResponseWriter, r *radius.Request) {
 	nasIP := rfc2865.NASIPAddress_Get(r.Packet)
 	logger := s.log.WithFields(logrus.Fields{
@@ -120,10 +134,14 @@ func (s *Server) handleAccessRequest(w radius.ResponseWriter, r *radius.Request)
 	start := time.Now()
 
 	userName := rfc2865.UserName_GetString(r.Packet)
-	nasIP := rfc2865.NASIPAddress_Get(r.Packet)
+	packetIP := packetSourceIP(r)
+	if packetIP == nil || packetIP.IsUnspecified() {
+		packetIP = rfc2865.NASIPAddress_Get(r.Packet)
+	}
+	nasIPStr := packetIP.String()
 	logger := s.log.WithFields(logrus.Fields{
 		"username": userName,
-		"nas":      nasIP.String(),
+		"nas":      nasIPStr,
 	})
 
 	var valid bool
@@ -139,7 +157,7 @@ func (s *Server) handleAccessRequest(w radius.ResponseWriter, r *radius.Request)
 		FramedIP:         framedIPAddr,
 		CallingStationID: callingStationID,
 		CalledStationID:  calledStationID,
-		NASIPAddr:        nasIP.String(),
+		NASIPAddr:        nasIPStr,
 	}
 
 	// Check if this is a MAC authentication request
@@ -194,7 +212,11 @@ func (s *Server) handleAccessRequest(w radius.ResponseWriter, r *radius.Request)
 func (s *Server) handleAccountingRequest(w radius.ResponseWriter, r *radius.Request) {
 	start := time.Now()
 
-	nasIPAddr := rfc2865.NASIPAddress_Get(r.Packet).String()
+	packetIP := packetSourceIP(r)
+	if packetIP == nil || packetIP.IsUnspecified() {
+		packetIP = rfc2865.NASIPAddress_Get(r.Packet)
+	}
+	nasIPAddr := packetIP.String()
 	userName := rfc2865.UserName_GetString(r.Packet)
 	logger := s.log.WithFields(logrus.Fields{
 		"username": userName,
