@@ -3,6 +3,8 @@ server:
   nas_networks:
     - 192.168.1.0/24
     - 10.8.8.0/24
+    - 172.16.0.0/24
+    - 10.200.2.0/24
     - 127.0.0.1
   # RADIUS shared secret
   secret: "IoT@radius.com"
@@ -20,10 +22,12 @@ redis:
   password: "c2hpZGFveHVhbmRldnRlYW0="
 
 message_export:
-  type: "file"
+  type: "kafka"
   kafka:
     brokers:
-      - "localhost:9092"
+      - "ser--0003.novalocal:9092"
+      - "ser--0004.novalocal:9092"
+      - "ser--0005.novalocal:9092"
     topic: "radius"
   nats:
     url: "nats://localhost:4222"
