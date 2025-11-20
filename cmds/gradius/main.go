@@ -59,10 +59,8 @@ func main() {
 	switch exporterType {
 	case "kafka":
 		exporterConfig["brokers"] = viper.GetStringSlice("message_export.kafka.brokers")
-		exporterConfig["topic"] = viper.GetString("message_export.kafka.topic")
 	case "nats":
 		exporterConfig["url"] = viper.GetString("message_export.nats.url")
-		exporterConfig["subject"] = viper.GetString("message_export.nats.subject")
 	case "file":
 		log.Info("Using file logging for AAA data")
 	default:

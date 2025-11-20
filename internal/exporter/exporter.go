@@ -5,6 +5,11 @@ import (
 	"gradius/internal/logger"
 )
 
+var (
+	authTopic = "radius_auth"
+	acctTopic = "radius_acct"
+)
+
 type MessageExporter interface {
 	SendAccountingData(data *AccountingData) error
 	SendAuthingData(data *AuthingData) error
@@ -56,13 +61,9 @@ func NewMessageExporter(config map[string]interface{}) (MessageExporter, error) 
 		if !ok {
 			return nil, fmt.Errorf("invalid kafka brokers config")
 		}
-		topic, ok := config["topic"].(string)
-		if !ok {
-			return nil, fmt.Errorf("invalid kafka topic config")
-		}
 
 		// Try to connect to Kafka
-		exporter, err := NewKafkaMessageExporter(brokers, topic)
+		exporter, err := NewKafkaMessageExporter(brokers, authTopic, acctTopic)
 		if err != nil {
 			log.Warnf("Falling back to file exporter from Kafka")
 			return NewFileMessageExporter()
@@ -74,13 +75,9 @@ func NewMessageExporter(config map[string]interface{}) (MessageExporter, error) 
 		if !ok {
 			return nil, fmt.Errorf("invalid nats url config")
 		}
-		subject, ok := config["subject"].(string)
-		if !ok {
-			return nil, fmt.Errorf("invalid nats subject config")
-		}
 
 		// Try to connect to NATS
-		exporter, err := NewNatsMessageExporter(url, subject)
+		exporter, err := NewNatsMessageExporter(url, authTopic, acctTopic)
 		if err != nil {
 			log.Warnf("Falling back to file exporter from NATS")
 			return NewFileMessageExporter()

@@ -10,12 +10,13 @@ import (
 )
 
 type KafkaMessageExporter struct {
-	producer sarama.SyncProducer
-	topic    string
-	log      *logrus.Logger
+	producer  sarama.SyncProducer
+	authTopic string
+	acctTopic string
+	log       *logrus.Logger
 }
 
-func NewKafkaMessageExporter(brokers []string, topic string) (*KafkaMessageExporter, error) {
+func NewKafkaMessageExporter(brokers []string, authTopic, acctTopic string) (*KafkaMessageExporter, error) {
 	log := logger.GetLogger()
 
 	config := sarama.NewConfig()
@@ -24,8 +25,9 @@ func NewKafkaMessageExporter(brokers []string, topic string) (*KafkaMessageExpor
 	config.Producer.Return.Successes = true
 
 	log.WithFields(logrus.Fields{
-		"brokers": brokers,
-		"topic":   topic,
+		"brokers":    brokers,
+		"auth_topic": authTopic,
+		"acct_topic": acctTopic,
 	}).Info("Connecting to Kafka")
 
 	producer, err := sarama.NewSyncProducer(brokers, config)
@@ -36,9 +38,10 @@ func NewKafkaMessageExporter(brokers []string, topic string) (*KafkaMessageExpor
 
 	log.Info("Successfully connected to Kafka")
 	return &KafkaMessageExporter{
-		producer: producer,
-		topic:    topic,
-		log:      log,
+		producer:  producer,
+		authTopic: authTopic,
+		acctTopic: acctTopic,
+		log:       log,
 	}, nil
 }
 
@@ -56,7 +59,7 @@ func (k *KafkaMessageExporter) SendAuthingData(data *AuthingData) error {
 	}
 
 	msg := &sarama.ProducerMessage{
-		Topic: k.topic,
+		Topic: k.authTopic,
 		Value: sarama.StringEncoder(jsonData),
 		Key:   sarama.StringEncoder(data.UserName),
 	}
@@ -92,7 +95,7 @@ func (k *KafkaMessageExporter) SendAccountingData(data *AccountingData) error {
 	}
 
 	msg := &sarama.ProducerMessage{
-		Topic: k.topic,
+		Topic: k.acctTopic,
 		Value: sarama.StringEncoder(jsonData),
 		Key:   sarama.StringEncoder(data.AcctSessionID),
 	}

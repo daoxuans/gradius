@@ -10,17 +10,19 @@ import (
 )
 
 type NatsMessageExporter struct {
-	conn    *nats.Conn
-	subject string
-	log     *logrus.Logger
+	conn      *nats.Conn
+	authTopic string
+	acctTopic string
+	log       *logrus.Logger
 }
 
-func NewNatsMessageExporter(url, subject string) (*NatsMessageExporter, error) {
+func NewNatsMessageExporter(url, authTopic, acctTopic string) (*NatsMessageExporter, error) {
 	log := logger.GetLogger()
 
 	log.WithFields(logrus.Fields{
-		"url":     url,
-		"subject": subject,
+		"url":        url,
+		"auth_topic": authTopic,
+		"acct_topic": acctTopic,
 	}).Info("Connecting to NATS")
 
 	conn, err := nats.Connect(url)
@@ -31,9 +33,10 @@ func NewNatsMessageExporter(url, subject string) (*NatsMessageExporter, error) {
 
 	log.Info("Successfully connected to NATS")
 	return &NatsMessageExporter{
-		conn:    conn,
-		subject: subject,
-		log:     log,
+		conn:      conn,
+		authTopic: authTopic,
+		acctTopic: acctTopic,
+		log:       log,
 	}, nil
 }
 
@@ -50,7 +53,7 @@ func (n *NatsMessageExporter) SendAuthingData(data *AuthingData) error {
 		return fmt.Errorf("failed to marshal authing data: %w", err)
 	}
 
-	err = n.conn.Publish(n.subject, jsonData)
+	err = n.conn.Publish(n.authTopic, jsonData)
 	if err != nil {
 		logger.WithError(err).Error("Failed to publish message to NATS")
 		return fmt.Errorf("failed to publish message to NATS: %w", err)
@@ -75,7 +78,7 @@ func (n *NatsMessageExporter) SendAccountingData(data *AccountingData) error {
 		return fmt.Errorf("failed to marshal accounting data: %w", err)
 	}
 
-	err = n.conn.Publish(n.subject, jsonData)
+	err = n.conn.Publish(n.acctTopic, jsonData)
 	if err != nil {
 		logger.WithError(err).Error("Failed to publish message to NATS")
 		return fmt.Errorf("failed to publish message to NATS: %w", err)

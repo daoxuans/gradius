@@ -28,10 +28,8 @@ message_export:
       - "ser--0003.novalocal:9092"
       - "ser--0004.novalocal:9092"
       - "ser--0005.novalocal:9092"
-    topic: "radius"
   nats:
     url: "nats://localhost:4222"
-    subject: "radius"
 
 logging:
   # Log file path
