@@ -83,13 +83,19 @@ func packetSourceIP(r *radius.Request) net.IP {
 
 func (s *Server) handlePacket(w radius.ResponseWriter, r *radius.Request) {
 	nasIP := rfc2865.NASIPAddress_Get(r.Packet)
+	packetIP := packetSourceIP(r)
+	if packetIP == nil || packetIP.IsUnspecified() {
+		packetIP = nasIP
+	}
+	nasIPStr := packetIP.String()
+
 	logger := s.log.WithFields(logrus.Fields{
 		"code":   r.Code.String(),
 		"client": r.RemoteAddr.String(),
-		"nas_ip": nasIP.String(),
+		"nas_ip": nasIPStr,
 	})
 
-	if !s.nasValidator.IsAllowed(nasIP) {
+	if !s.nasValidator.IsAllowed(packetIP) {
 		logger.Warn("Unauthorized NAS IP address")
 		w.Write(r.Response(radius.CodeAccessReject))
 		return
